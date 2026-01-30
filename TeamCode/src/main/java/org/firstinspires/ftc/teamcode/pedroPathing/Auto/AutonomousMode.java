@@ -20,7 +20,7 @@ import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.pedropathing.paths.PathChain;
 
-@Autonomous(name = "Limelight Far (Motif v5.5.2)", group = "Auto")
+@Autonomous(name = "6-Ball Auto Far (Motif v5.5.1)", group = "Auto")
 public class AutonomousMode extends LinearOpMode {
 
     // ===================== ALLIANCE SELECTION =====================
@@ -43,7 +43,6 @@ public class AutonomousMode extends LinearOpMode {
     // ===================== TIMING =====================
     private ElapsedTime runtime = new ElapsedTime();
     private ElapsedTime stateTimer = new ElapsedTime();
-    private ElapsedTime shootTimer = new ElapsedTime();
 
     // New timer for intake sequencing
     private ElapsedTime intakeSeqTimer = new ElapsedTime();
@@ -68,7 +67,7 @@ public class AutonomousMode extends LinearOpMode {
     private static final double PICKUP_TIMEOUT_SEC = 2.0;
 
     // UPDATED: Changed from Power to Velocity based on Drive file
-    private static final double SHOOT_VELOCITY = 1298; //1200
+    private static final double SHOOT_VELOCITY = 1200; //1200
 
     private static final double CHAMBER_WAIT = 2.5; //1.9, 1.0, 1.4, 2.4
     private static final double ATM_PUSH_TIME_FIRST = 2.0; //2.3
@@ -89,7 +88,7 @@ public class AutonomousMode extends LinearOpMode {
     // --- BLUE COORDINATES ---
     // --- CHANGE BACK IF NEEDED ---
     private final Pose BLUE_START = new Pose(57, 8.5, Math.toRadians(270)); //x=62.13 y=7.03
-    private final Pose BLUE_SHOOT = new Pose(56, 15, Math.toRadians(292)); //x=56 y=17, HEADING = 297
+    private final Pose BLUE_SHOOT = new Pose(56, 15, Math.toRadians(299)); //x=56 y=17, HEADING = 297
 
     // Blue Pre-Intake (Start driving from here)
     private final Pose BLUE_INTAKE_GPP = new Pose(56, 34, Math.toRadians(-180)); //x=56 y=34
@@ -125,9 +124,7 @@ public class AutonomousMode extends LinearOpMode {
 
     // --- VARIABLES ---
     private MotifDetector.Motif detectedMotif = MotifDetector.Motif.UNKNOWN;
-    private int ballsShot = 0;
-    private int shootSubState = 0;
-    private boolean inSecondShootingPhase = false;
+    private ShootingController shootingController;
     private String decisionReason = "Waiting";
 
     @Override
@@ -166,9 +163,6 @@ public class AutonomousMode extends LinearOpMode {
         }
 
         follower.setStartingPose(startPose);
-        buildAndFollowPath(startPose, shootPose);
-        flywheelMotor.setVelocity(SHOOT_VELOCITY);
-
         runtime.reset();
         currentState = AutoState.SCAN_MOTIF;
         stateTimer.reset();
@@ -225,39 +219,54 @@ public class AutonomousMode extends LinearOpMode {
         limelight.switchPipeline(0);
         goalTargeter = new GoalTargeter(limelight);
         motifDetector = new MotifDetector();
+        
+        // 初始化射击控制器
+        shootingController = new ShootingController();
     }
 
     // ===================== LOGIC =====================
 
     private void runScanMotif() {
-        // Continuously check for confident detection while driving
-        if (detectedMotif == MotifDetector.Motif.UNKNOWN && motifDetector.hasConfidentDetection()) {
+        if (motifDetector.hasConfidentDetection()) {
             detectedMotif = motifDetector.getDetectedMotif();
-            decisionReason = "Confident (Drive)";
-            RobotLog.d("AUTO", "Motif Locked (Confident): " + detectedMotif);
+            decisionReason = "Confident";
+            lockInMotifAndGo();
+            return;
         }
 
-        // Once we arrive at the shooting position, lock in whatever we found
-        if (!follower.isBusy()) {
-            if (detectedMotif == MotifDetector.Motif.UNKNOWN) {
-                MotifDetector.Motif lastSeen = motifDetector.getDetectedMotif();
-                if (lastSeen != MotifDetector.Motif.UNKNOWN) {
-                    detectedMotif = lastSeen;
-                    decisionReason = "Arrived (Weak)";
-                } else {
-                    detectedMotif = MotifDetector.Motif.GPP;
-                    decisionReason = "Arrived (Default)";
-                }
-                RobotLog.d("AUTO", "Motif Locked (Final): " + detectedMotif);
+        if (stateTimer.seconds() > SCAN_TIMEOUT_SEC) {
+            MotifDetector.Motif lastSeen = motifDetector.getDetectedMotif();
+            if (lastSeen != MotifDetector.Motif.UNKNOWN) {
+                detectedMotif = lastSeen;
+                decisionReason = "Timeout (Weak)";
+            } else {
+                detectedMotif = MotifDetector.Motif.GPP;
+                decisionReason = "Timeout (Default)";
             }
-            transitionTo(AutoState.SHOOT_PRELOADS);
+            lockInMotifAndGo();
         }
     }
 
+    private void lockInMotifAndGo() {
+        RobotLog.d("AUTO", "Motif Locked: " + detectedMotif);
+        buildAndFollowPath(startPose, shootPose);
+        transitionTo(AutoState.SHOOT_PRELOADS);
+        flywheelMotor.setVelocity(SHOOT_VELOCITY);
+        
+        // 启动第一阶段射击
+        shootingController.startShooting(false);
+    }
+
     private void runShootPreloads() {
-        // Step 1: Start at Shoot Pos 3 Reg turns (A)
         if (follower.isBusy()) return;
-        runShootingLogic(false);
+        
+        // 使用射击控制器
+        if (shootingController.update()) {
+            // 第一阶段射击完成,转入收集球阶段
+            flywheelMotor.setVelocity(0);
+            setTargetForMotif();
+            transitionTo(AutoState.NAV_TO_PRE_INTAKE);
+        }
     }
 
     private void runNavToPreIntake() {
@@ -363,56 +372,23 @@ public class AutonomousMode extends LinearOpMode {
         chamberSpinner.setTargetPosition((int) chamberTargetPos);
         chamberSpinner.setPower(1);
 
-        inSecondShootingPhase = true;
-        ballsShot = 0;
-        shootSubState = 0;
+        // 启动第二阶段射击
+        shootingController.startShooting(true);
         transitionTo(AutoState.ALIGN_AND_SHOOT);
     }
 
     private void runAlignAndShoot() {
         flywheelMotor.setVelocity(SHOOT_VELOCITY);
-        // Step 5: "then spin 3 reg times (A)"
-        runShootingLogic(true);
-    }
-
-    private void runShootingLogic(boolean isSecondPhase) {
-        switch (shootSubState) {
-            case 0:
-                moveChamberStep();
-                shootTimer.reset();
-                shootSubState = 1;
-                break;
-            case 1:
-                if (shootTimer.seconds() >= CHAMBER_WAIT) {
-                    artifactTransfer.setDirection(DcMotorSimple.Direction.FORWARD);
-                    artifactTransfer.setPower(1);
-                    shootTimer.reset();
-                    shootSubState = 2;
-                }
-                break;
-            case 2:
-                double pushTime = (ballsShot == 0 && !isSecondPhase) ? ATM_PUSH_TIME_FIRST : ATM_PUSH_TIME_NORMAL;
-                if (shootTimer.seconds() >= pushTime) {
-                    artifactTransfer.setPower(0);
-                    shootSubState = 3;
-                }
-                break;
-            case 3:
-                ballsShot++;
-                if (ballsShot >= 3) {
-                    flywheelMotor.setVelocity(0);
-                    if (!isSecondPhase) {
-                        setTargetForMotif();
-                        transitionTo(AutoState.NAV_TO_PRE_INTAKE);
-                    } else {
-                        transitionTo(AutoState.DONE);
-                    }
-                } else {
-                    shootSubState = 0;
-                }
-                break;
+        
+        // 使用射击控制器
+        if (shootingController.update()) {
+            // 第二阶段射击完成,自动程序结束
+            flywheelMotor.setVelocity(0);
+            transitionTo(AutoState.DONE);
         }
     }
+
+
 
     private void setTargetForMotif() {
         if (selectedAlliance == Alliance.BLUE) {
@@ -487,12 +463,184 @@ public class AutonomousMode extends LinearOpMode {
         chamberSpinner.setPower(1); //0.6
     }
 
+    // ===================== SHOOTING CONTROLLER =====================
+    
+    /**
+     * 射击控制器 - 封装完整的射击序列逻辑
+     * 
+     * 射击流程:
+     * 1. IDLE -> ROTATING_CHAMBER: 旋转腔室到下一个球
+     * 2. ROTATING_CHAMBER -> WAITING_STABILIZATION: 等待腔室和飞轮稳定
+     * 3. WAITING_STABILIZATION -> PUSHING_BALL: 推球进入发射器
+     * 4. PUSHING_BALL -> BALL_SHOT: 球已发射,记录计数
+     * 5. BALL_SHOT -> ROTATING_CHAMBER (如果还有球) 或 IDLE (完成)
+     */
+    private class ShootingController {
+        /**
+         * 射击状态枚举
+         */
+        private enum ShootState {
+            IDLE,                    // 空闲状态
+            ROTATING_CHAMBER,        // 旋转腔室
+            WAITING_STABILIZATION,   // 等待稳定
+            PUSHING_BALL,            // 推球
+            BALL_SHOT                // 球已发射
+        }
+        
+        // 状态变量
+        private ShootState state = ShootState.IDLE;
+        private ElapsedTime stateTimer = new ElapsedTime();
+        private int ballsShot = 0;
+        private boolean isSecondPhase = false;
+        
+        /**
+         * 开始射击序列
+         * 
+         * @param secondPhase true 表示第二阶段射击(收集的球), false 表示第一阶段(预装球)
+         */
+        public void startShooting(boolean secondPhase) {
+            this.isSecondPhase = secondPhase;
+            this.ballsShot = 0;
+            transitionToState(ShootState.ROTATING_CHAMBER);
+            RobotLog.d("SHOOT", "Starting shooting sequence, phase=" + (secondPhase ? "2" : "1"));
+        }
+        
+        /**
+         * 更新射击状态机
+         * 
+         * @return true 如果射击序列完成(3个球已发射), false 如果仍在进行中
+         */
+        public boolean update() {
+            switch (state) {
+                case IDLE:
+                    return false;
+                    
+                case ROTATING_CHAMBER:
+                    return handleRotatingChamber();
+                    
+                case WAITING_STABILIZATION:
+                    return handleWaitingStabilization();
+                    
+                case PUSHING_BALL:
+                    return handlePushingBall();
+                    
+                case BALL_SHOT:
+                    return handleBallShot();
+                    
+                default:
+                    return false;
+            }
+        }
+        
+        /**
+         * 处理旋转腔室状态
+         */
+        private boolean handleRotatingChamber() {
+            moveChamberStep();
+            transitionToState(ShootState.WAITING_STABILIZATION);
+            return false;
+        }
+        
+        /**
+         * 处理等待稳定状态
+         */
+        private boolean handleWaitingStabilization() {
+            if (stateTimer.seconds() >= CHAMBER_WAIT) {
+                // 启动传送带推球
+                artifactTransfer.setDirection(DcMotorSimple.Direction.FORWARD);
+                artifactTransfer.setPower(1);
+                transitionToState(ShootState.PUSHING_BALL);
+            }
+            return false;
+        }
+        
+        /**
+         * 处理推球状态
+         */
+        private boolean handlePushingBall() {
+            // 第一阶段的第一个球需要更长的推送时间
+            double pushTime = (ballsShot == 0 && !isSecondPhase) 
+                ? ATM_PUSH_TIME_FIRST 
+                : ATM_PUSH_TIME_NORMAL;
+                
+            if (stateTimer.seconds() >= pushTime) {
+                // 停止传送带
+                artifactTransfer.setPower(0);
+                transitionToState(ShootState.BALL_SHOT);
+            }
+            return false;
+        }
+        
+        /**
+         * 处理球已发射状态
+         */
+        private boolean handleBallShot() {
+            ballsShot++;
+            RobotLog.d("SHOOT", "Ball " + ballsShot + " shot (phase " + (isSecondPhase ? "2" : "1") + ")");
+            
+            if (ballsShot >= 3) {
+                // 射击序列完成
+                RobotLog.d("SHOOT", "Shooting sequence complete");
+                transitionToState(ShootState.IDLE);
+                return true;
+            } else {
+                // 继续射击下一个球
+                transitionToState(ShootState.ROTATING_CHAMBER);
+                return false;
+            }
+        }
+        
+        /**
+         * 状态转换辅助方法
+         */
+        private void transitionToState(ShootState newState) {
+            if (state != newState) {
+                RobotLog.d("SHOOT", "State: " + state + " -> " + newState);
+            }
+            this.state = newState;
+            this.stateTimer.reset();
+        }
+        
+        /**
+         * 获取已发射的球数
+         */
+        public int getBallsShot() {
+            return ballsShot;
+        }
+        
+        /**
+         * 获取当前状态(用于调试)
+         */
+        public ShootState getState() {
+            return state;
+        }
+        
+        /**
+         * 重置控制器
+         */
+        public void reset() {
+            state = ShootState.IDLE;
+            ballsShot = 0;
+            isSecondPhase = false;
+            stateTimer.reset();
+            RobotLog.d("SHOOT", "Controller reset");
+        }
+    }
+
+
     private void updateTelemetry() {
         telemetry.addData("State", currentState);
         telemetry.addData("Alliance", selectedAlliance);
         telemetry.addData("Motif", detectedMotif);
-        // Added Velocity check
         telemetry.addData("Flywheel Vel", flywheelMotor.getVelocity());
+        
+        // 添加射击状态信息
+        if (currentState == AutoState.SHOOT_PRELOADS || 
+            currentState == AutoState.ALIGN_AND_SHOOT) {
+            telemetry.addData("Shoot State", shootingController.getState());
+            telemetry.addData("Balls Shot", shootingController.getBallsShot() + " / 3");
+        }
+        
         if (finalIntakePose != null) {
             telemetry.addData("Target Final X", "%.1f", finalIntakePose.getX());
         }
