@@ -8,96 +8,96 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 
-@TeleOp(name = "空间感知驾驶测试 (Field Centric)", group = "Test")
+@TeleOp(name = "Field Centric Test", group = "Test")
 public class FieldCentricTest extends LinearOpMode {
 
-    // 定义底盘马达
+    // Define chassis motors
     private DcMotor leftFront, leftBack, rightFront, rightBack;
-    // 定义陀螺仪 (这是空间感知的核心)
+    // Define IMU (Gyroscope), the core of spatial awareness
     private IMU imu;
 
     @Override
     public void runOpMode() {
-        // 1. 硬件映射 (名字要和你手机上的一样)
+        // 1. Hardware Mapping (names must match your Driver Station config)
         leftFront = hardwareMap.get(DcMotor.class, "leftFront");
         leftBack = hardwareMap.get(DcMotor.class, "leftBack");
         rightFront = hardwareMap.get(DcMotor.class, "rightFront");
         rightBack = hardwareMap.get(DcMotor.class, "rightBack");
-        
+
         imu = hardwareMap.get(IMU.class, "imu");
 
-        // 2. 设置马达方向 (根据你的 drive.java 配置)
+        // 2. Set Motor Directions (Based on your drive.java config)
         leftBack.setDirection(DcMotorSimple.Direction.REVERSE);
         leftFront.setDirection(DcMotorSimple.Direction.REVERSE);
-        // 右边通常是 FORWARD，如果发现转反了改这里
+        // Right side is usually FORWARD, change if wheels spin wrong way
         rightBack.setDirection(DcMotorSimple.Direction.FORWARD);
         rightFront.setDirection(DcMotorSimple.Direction.FORWARD);
 
-        // 设置刹车模式 (松手即停，手感更好)
+        // Set Zero Power Behavior (Brake when zero power, gives better control)
         leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         leftBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // 3. 初始化 IMU (陀螺仪) - 这一步最关键！
-        // 请检查你的 Control Hub 是怎么安装的：
-        // 下面的设置假设：Hub 平躺 (Logo UP)，接口朝前 (USB FORWARD)
-        // 如果你的 Hub 是竖着装的，需要修改这里！
+        // 3. Initialize IMU (Gyro) - CRITICAL STEP!
+        // Check how your Control Hub is mounted on the robot:
+        // The settings below assume: Hub is laying flat (Logo UP), USB port facing forward (USB FORWARD)
+        // If your Hub is mounted vertically, you MUST change these parameters!
         IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
                 RevHubOrientationOnRobot.LogoFacingDirection.UP,
                 RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
         imu.initialize(parameters);
 
-        telemetry.addLine("初始化完成！");
-        telemetry.addLine("操作说明：");
-        telemetry.addLine("1. 左摇杆控制移动 (绝对方向)");
-        telemetry.addLine("2. 右摇杆控制旋转");
-        telemetry.addLine("3. 如果方向歪了，按【Options/Start】键重置");
+        telemetry.addLine("Initialization Complete!");
+        telemetry.addLine("Instructions:");
+        telemetry.addLine("1. Left Stick moves relative to the FIELD");
+        telemetry.addLine("2. Right Stick rotates the robot");
+        telemetry.addLine("3. Press [Options/Start] to reset forward direction");
         telemetry.update();
 
         waitForStart();
 
         while (opModeIsActive()) {
-            // === 核心逻辑开始 ===
+            // === Core Logic ===
 
-            // 1. 获取摇杆输入
-            double y = -gamepad1.left_stick_y; // 前后 (推杆是负数，所以要取反)
-            double x = gamepad1.left_stick_x;  // 左右
-            double rx = gamepad1.right_stick_x; // 旋转
+            // 1. Get Joystick Inputs
+            double y = -gamepad1.left_stick_y; // Forward/Back (Stick is negative when up, so invert)
+            double x = gamepad1.left_stick_x;  // Left/Right
+            double rx = gamepad1.right_stick_x; // Rotation
 
-            // 2. 重置功能：如果驾驶员觉得"正前方"不对了，按这个键重置
+            // 2. Reset Heading: If driver feels "Forward" is off, press this to reset
             if (gamepad1.options) {
                 imu.resetYaw();
             }
 
-            // 3. 获取机器人当前的朝向 (弧度制)
+            // 3. Get current robot heading (in radians)
             double botHeading = imu.getRobotYawPitchRoll().yaw;
 
-            // 4. 空间感知数学公式 (旋转坐标系)
-            // 这就是让机器人"忘了车头，只认场地"的魔法
+            // 4. Field Centric Math (Coordinate Rotation)
+            // This is the magic that makes the robot "forget its head and follow the field"
             double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
             double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
 
-            // 修正侧向移动速度 (麦克纳姆轮横移通常比直行慢，乘以1.1补偿)
+            // Compensate for strafing friction (Mecanum wheels are slower sideways, multiply by 1.1)
             rotX = rotX * 1.1;
 
-            // 5. 计算四个轮子的动力
-            // 现在的 rotY 和 rotX 已经是相对于场地的了
+            // 5. Calculate Motor Powers
+            // Use the rotated rotX and rotY (field relative values)
             double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(rx), 1);
             double frontLeftPower = (rotY + rotX + rx) / denominator;
             double backLeftPower = (rotY - rotX + rx) / denominator;
             double frontRightPower = (rotY - rotX - rx) / denominator;
             double backRightPower = (rotY + rotX - rx) / denominator;
 
-            // 6. 输出动力
+            // 6. Set Motor Powers
             leftFront.setPower(frontLeftPower);
             leftBack.setPower(backLeftPower);
             rightFront.setPower(frontRightPower);
             rightBack.setPower(backRightPower);
 
-            // === 遥测显示 ===
-            telemetry.addData("模式", "Field Centric (空间感知)");
-            telemetry.addData("车头朝向", "%.1f 度", Math.toDegrees(botHeading));
+            // === Telemetry ===
+            telemetry.addData("Mode", "Field Centric");
+            telemetry.addData("Heading", "%.1f deg", Math.toDegrees(botHeading));
             telemetry.update();
         }
     }
