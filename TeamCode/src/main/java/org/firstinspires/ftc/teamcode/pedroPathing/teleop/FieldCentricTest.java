@@ -55,7 +55,7 @@ public class FieldCentricTest extends LinearOpMode {
         telemetry.addLine("3. Press [Options/Start] to reset forward direction");
         telemetry.update();
 
-        waitForStart();
+        waitForStart();//
 
         while (opModeIsActive()) {
             // === Core Logic ===
