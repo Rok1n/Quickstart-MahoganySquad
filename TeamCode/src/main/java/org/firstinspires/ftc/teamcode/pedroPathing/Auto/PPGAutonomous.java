@@ -53,7 +53,7 @@ public class PPGAutonomous extends LinearOpMode {
     private static final double NAV_TIMEOUT_SEC = 5.0;
     private static final double PICKUP_TIMEOUT_SEC = 2.0;
 
-    private static final double SHOOT_VELOCITY = 1000;
+    private static final double SHOOT_VELOCITY = 1025;
     private static final double CHAMBER_WAIT = 1.8;
     private static final double START_WAIT = 2.4; 
     private static final double ATM_PUSH_TIME_FIRST = 2.0;
@@ -210,7 +210,7 @@ public class PPGAutonomous extends LinearOpMode {
         flywheelMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         flywheelMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        PIDFCoefficients pidfNew = new PIDFCoefficients(11, 0, 0, 9.6);
+        PIDFCoefficients pidfNew = new PIDFCoefficients(20.3025, 0, 0, 20.7020);
         flywheelMotor.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidfNew);
 
         intakeMotor.setDirection(DcMotorSimple.Direction.REVERSE);

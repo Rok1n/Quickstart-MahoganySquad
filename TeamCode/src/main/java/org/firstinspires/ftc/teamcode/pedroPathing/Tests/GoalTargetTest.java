@@ -4,6 +4,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import org.firstinspires.ftc.teamcode.pedroPathing.vision.VisionData;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.mechanisms.Limelight;
@@ -56,20 +57,26 @@ public class GoalTargetTest extends LinearOpMode {
             boolean isLocking = gamepad1.a;
             boolean tagDetected = goalTargeter.hasTarget() && goalTargeter.getVisionData().getTagID() == BLUE_GOAL_TAG_ID;
 
-            if (isLocking && tagDetected) {
-                // Override rotation with steering correction
-                rz = goalTargeter.getSteeringCorrection();
-                
-                // Optional: add drive correction to maintain distance
-                double driveCorr = goalTargeter.getDriveCorrection();
-                y += driveCorr;
+            if (isLocking) {
+                // Ground the robot: zero out all translation (x and y) 
+                // so it only rotates to face the tag.
+                x = 0;
+                y = 0;
+
+                if (tagDetected) {
+                    // Override rotation with steering correction to face tag
+                    rz = -goalTargeter.getSteeringCorrection();
+                } else {
+                    // If no tag is seen, stop rotating as well
+                    rz = 0;
+                }
             }
 
             // Mecanum Drive Math
-            double lbPower = (y - x) + rz;
-            double lfPower = y + x + rz;
-            double rbPower = (y + x) - rz;
-            double rfPower = (y - x) - rz;
+            double lbPower = (y + x) + rz;
+            double lfPower = y - x + rz;
+            double rbPower = (y - x) - rz;
+            double rfPower = (y + x) - rz;
 
             // Normalize powers
             double max = Math.max(1.0, Math.max(Math.abs(lbPower), Math.max(Math.abs(lfPower), 

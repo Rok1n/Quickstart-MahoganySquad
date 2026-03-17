@@ -188,7 +188,7 @@ public class GPPAutonomous extends LinearOpMode {
         flywheelMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         flywheelMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        PIDFCoefficients pidfNew = new PIDFCoefficients(10.5, 0, 0, 9.1);
+        PIDFCoefficients pidfNew = new PIDFCoefficients(20.3025, 0, 0, 20.7020);
         flywheelMotor.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidfNew);
 
         intakeMotor.setDirection(DcMotorSimple.Direction.REVERSE);

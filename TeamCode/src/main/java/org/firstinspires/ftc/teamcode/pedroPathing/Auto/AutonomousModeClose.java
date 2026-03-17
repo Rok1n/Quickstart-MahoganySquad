@@ -11,14 +11,16 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.RobotLog;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.pedroPathing.mechanisms.Limelight;
 import org.firstinspires.ftc.teamcode.pedroPathing.vision.GoalTargeter;
 import org.firstinspires.ftc.teamcode.pedroPathing.vision.MotifDetector; //cool2
+import org.firstinspires.ftc.teamcode.pedroPathing.vision.VisionData;
 
-@Autonomous(name = "Limelight Close (Motif v1.1.2)", group = "Auto")
+@Autonomous(name = "Limelight Close (Motif v1.1.3)", group = "Auto")
 public class AutonomousModeClose extends LinearOpMode {
 
     // ===================== ALLIANCE SELECTION =====================
@@ -39,6 +41,7 @@ public class AutonomousModeClose extends LinearOpMode {
     private DcMotor chamberSpinner;
     private DcMotor intakeMotor;
     private CRServo artifactTransfer;
+    private Servo LimeServo;
 
     // ===================== TIMING =====================
     private ElapsedTime runtime = new ElapsedTime();
@@ -70,10 +73,10 @@ public class AutonomousModeClose extends LinearOpMode {
     private static final double PICKUP_TIMEOUT_SEC = 2.0;
 
     // UPDATED: Changed from Power to Velocity based on Drive file
-    private static final double SHOOT_VELOCITY = 1000; //CHANGE
+    private static final double SHOOT_VELOCITY = 1025; //CHANGE
 
-    private static final double CHAMBER_WAIT = 1.8; //1.9, 1.0, 1.4, 2.4
-    private static final double ATM_PUSH_TIME_FIRST = 2.0; //2.3
+    private static final double CHAMBER_WAIT = 1.7; //1.9, 1.0, 1.4, 2.4
+    private static final double ATM_PUSH_TIME_FIRST = 0.9; //2.3
     private static final double ATM_PUSH_TIME_NORMAL = 0.9;
 
     // --- Chamber Stepper Variables ---
@@ -92,29 +95,29 @@ public class AutonomousModeClose extends LinearOpMode {
     // --- BLUE COORDINATES ---
     // --- CHANGE BACK IF NEEDED ---
     private final Pose BLUE_START = new Pose(20.968, 122.296, Math.toRadians(325)); //x=62.13 y=7.03
-    private final Pose BLUE_SHOOT = new Pose(59.686, 84.116, Math.toRadians(318)); //x=56 y=17, HEADING = 297
+    private final Pose BLUE_SHOOT = new Pose(52.686, 96.116, Math.toRadians(318)); //x=56 y=17, HEADING = 297
 
     // Blue Pre-Intake (Start driving from here)
-    private final Pose BLUE_INTAKE_GPP = new Pose(56, 34, Math.toRadians(-180)); //x=56 y=34
-    private final Pose BLUE_INTAKE_PGP = new Pose(60, 67, Math.toRadians(-180)); //y=58
-    private final Pose BLUE_INTAKE_PPG = new Pose(56, 82, Math.toRadians(-180)); //y=67
+    private final Pose BLUE_INTAKE_GPP = new Pose(64, 43, Math.toRadians(-180)); //x=51
+    private final Pose BLUE_INTAKE_PGP = new Pose(60, 67, Math.toRadians(-180)); //y=58 x 60
+    private final Pose BLUE_INTAKE_PPG = new Pose(58, 90, Math.toRadians(-180)); //y=54 x 56
 
     // Blue Intake End (Stop driving here)
-    private final Pose BLUE_INTAKE_GPP_END = new Pose(25, 34, Math.toRadians(-180)); //x35
-    private final Pose BLUE_INTAKE_PGP_END = new Pose(25, 67, Math.toRadians(-180)); //x35
-    private final Pose BLUE_INTAKE_PPG_END = new Pose(35, 82, Math.toRadians(-180));
+    private final Pose BLUE_INTAKE_GPP_END = new Pose(37, 43, Math.toRadians(-180));
+    private final Pose BLUE_INTAKE_PGP_END = new Pose(37, 67, Math.toRadians(-180)); //x25
+    private final Pose BLUE_INTAKE_PPG_END = new Pose(42, 90, Math.toRadians(-180));
 
     // --- RED COORDINATES ---
     private final Pose RED_START = new Pose(122.672, 122.457, Math.toRadians(215));
     private final Pose RED_SHOOT = new Pose(85, 85, Math.toRadians(225));
 
     // Red Pre-Intake (Mirrored X=48 -> X=88, Mirrored Y)
-    private final Pose RED_INTAKE_GPP = new Pose(82, 36, Math.toRadians(0));
-    private final Pose RED_INTAKE_PGP = new Pose(80, 42, Math.toRadians(0)); //x=82
-    private final Pose RED_INTAKE_PPG = new Pose(82, 64, Math.toRadians(0));
+    private final Pose RED_INTAKE_GPP = new Pose(80, 20, Math.toRadians(0)); //x 82
+    private final Pose RED_INTAKE_PGP = new Pose(86, 42, Math.toRadians(0)); //x=80e
+    private final Pose RED_INTAKE_PPG = new Pose(80, 64, Math.toRadians(0)); //x 82
 
     // Red Intake End (Mirrored X=16 -> X=128, X=9 -> X=135)
-    private final Pose RED_INTAKE_GPP_END = new Pose(112, 32, Math.toRadians(0));
+    private final Pose RED_INTAKE_GPP_END = new Pose(112, 20, Math.toRadians(0));
     private final Pose RED_INTAKE_PGP_END = new Pose(112, 42, Math.toRadians(0));
     private final Pose RED_INTAKE_PPG_END = new Pose(115, 64, Math.toRadians(0));
 
@@ -152,6 +155,13 @@ public class AutonomousModeClose extends LinearOpMode {
             // Vision Updates
             goalTargeter.update();
             motifDetector.update(goalTargeter.getVisionData());
+
+            // Telemetry-driven Servo positioning during selection
+            if (selectedAlliance == Alliance.BLUE) {
+                LimeServo.setPosition(0.75); // Move to right to see obelisk on blue
+            } else {
+                LimeServo.setPosition(0.25); // Move to left to see obelisk on red
+            }
 
             // Telemetry
             telemetry.addLine("=== LIMELIGHT CLOSE (ALLIANCE SELECTION) ===");
@@ -225,12 +235,13 @@ public class AutonomousModeClose extends LinearOpMode {
         chamberSpinner = hardwareMap.get(DcMotor.class, "chamberSpinner");
         intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
         artifactTransfer = hardwareMap.get(CRServo.class, "ATM");
+        LimeServo = hardwareMap.get(Servo.class, "axonLime");
 
         flywheelMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         flywheelMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         flywheelMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        PIDFCoefficients pidfNew = new PIDFCoefficients(11, 0, 0, 9.6); //f=11 p =10
+        PIDFCoefficients pidfNew = new PIDFCoefficients(20.3025, 0, 0, 20.7020); //f=11 p =10
         flywheelMotor.setPIDFCoefficients(
             DcMotor.RunMode.RUN_USING_ENCODER,
             pidfNew
@@ -249,6 +260,9 @@ public class AutonomousModeClose extends LinearOpMode {
         limelight.switchPipeline(0);
         goalTargeter = new GoalTargeter(limelight);
         motifDetector = new MotifDetector();
+        
+        // Default to center on hardware init
+        LimeServo.setPosition(0.5);
     }
 
     // ===================== LOGIC =====================
@@ -276,6 +290,10 @@ public class AutonomousModeClose extends LinearOpMode {
                 }
                 RobotLog.d("AUTO", "Motif Locked (Final): " + detectedMotif);
             }
+            
+            // Once we reach the first shoot position, center the camera for shots
+            LimeServo.setPosition(0.5);
+            
             transitionTo(AutoState.SHOOT_PRELOADS);
         }
     }

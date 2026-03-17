@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.pedroPathing.Auto;
 
+import com.bylazar.graph.PanelsGraph;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
@@ -19,7 +20,11 @@ import org.firstinspires.ftc.teamcode.pedroPathing.vision.GoalTargeter;
 import org.firstinspires.ftc.teamcode.pedroPathing.vision.MotifDetector;
 
 
+<<<<<<< HEAD
 @Autonomous(name = "6-Ball Auto Far (Motif v5.5.1)", group = "Auto")
+=======
+@Autonomous(name = "Limelight Far (Motif v5.5.5)", group = "Auto")
+>>>>>>> 9e1e7b68b9fe1f3e89df69324519782b82a75a79
 public class AutonomousMode extends LinearOpMode {
 
     // ===================== ALLIANCE SELECTION =====================
@@ -40,6 +45,8 @@ public class AutonomousMode extends LinearOpMode {
     private DcMotor chamberSpinner;
     private DcMotor intakeMotor;
     private CRServo artifactTransfer;
+
+    private PanelsGraph velocityGraph;
 
     // ===================== TIMING =====================
     private ElapsedTime runtime = new ElapsedTime();
@@ -180,6 +187,9 @@ public class AutonomousMode extends LinearOpMode {
             goalTargeter.update();
             motifDetector.update(goalTargeter.getVisionData());
 
+            // Update Graph
+
+
             switch (currentState) {
                 case SCAN_MOTIF:
                     runScanMotif();
@@ -225,7 +235,7 @@ public class AutonomousMode extends LinearOpMode {
         flywheelMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         flywheelMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        PIDFCoefficients pidfNew = new PIDFCoefficients(10.5, 0, 0, 9.2); //f=10 p=11
+        PIDFCoefficients pidfNew = new PIDFCoefficients(20.3025, 0, 0, 20.7020); //f=10 p=11
 
         flywheelMotor.setPIDFCoefficients(
             DcMotor.RunMode.RUN_USING_ENCODER,
@@ -245,9 +255,14 @@ public class AutonomousMode extends LinearOpMode {
         limelight.switchPipeline(0);
         goalTargeter = new GoalTargeter(limelight);
         motifDetector = new MotifDetector();
+<<<<<<< HEAD
         
         // 初始化射击控制器
         shootingController = new ShootingController();
+=======
+
+
+>>>>>>> 9e1e7b68b9fe1f3e89df69324519782b82a75a79
     }
 
     // ===================== LOGIC =====================

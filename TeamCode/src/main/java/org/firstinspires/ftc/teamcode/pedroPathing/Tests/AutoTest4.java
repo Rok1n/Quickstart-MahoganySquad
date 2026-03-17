@@ -98,9 +98,9 @@ public class AutoTest4 extends LinearOpMode {
     private final Pose BLUE_INTAKE_PPG = new Pose(56, 84, Math.toRadians(-180)); //y=67
 
     // Blue Intake End (Stop driving here)
-    private final Pose BLUE_INTAKE_GPP_END = new Pose(19, 36, Math.toRadians(-180)); //x35
-    private final Pose BLUE_INTAKE_PGP_END = new Pose(19, 60, Math.toRadians(-180)); //x35
-    private final Pose BLUE_INTAKE_PPG_END = new Pose(16, 84, Math.toRadians(-180));
+    private final Pose BLUE_INTAKE_GPP_END = new Pose(23, 36, Math.toRadians(-180)); //x35
+    private final Pose BLUE_INTAKE_PGP_END = new Pose(23, 60, Math.toRadians(-180)); //x35
+    private final Pose BLUE_INTAKE_PPG_END = new Pose(25, 84, Math.toRadians(-180));
 
     // --- RED COORDINATES ---
     private final Pose RED_START = new Pose(87, 8.5, Math.toRadians(270));
@@ -112,9 +112,9 @@ public class AutoTest4 extends LinearOpMode {
     private final Pose RED_INTAKE_PPG = new Pose(88, 84, Math.toRadians(0)); //y=67
 
     // Red Intake End (Mirrored X=16 -> X=128, X=9 -> X=135)
-    private final Pose RED_INTAKE_GPP_END = new Pose(128, 36, Math.toRadians(0));
-    private final Pose RED_INTAKE_PGP_END = new Pose(128, 60, Math.toRadians(0));
-    private final Pose RED_INTAKE_PPG_END = new Pose(126, 84, Math.toRadians(0));
+    private final Pose RED_INTAKE_GPP_END = new Pose(123, 36, Math.toRadians(0));
+    private final Pose RED_INTAKE_PGP_END = new Pose(123, 60, Math.toRadians(0));
+    private final Pose RED_INTAKE_PPG_END = new Pose(121, 84, Math.toRadians(0));
 
 // drive end
 

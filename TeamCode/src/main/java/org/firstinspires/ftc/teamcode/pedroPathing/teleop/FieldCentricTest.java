@@ -45,7 +45,11 @@ public class FieldCentricTest extends LinearOpMode {
         // If your Hub is mounted vertically, you MUST change these parameters!
         IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
                 RevHubOrientationOnRobot.LogoFacingDirection.UP,
+<<<<<<< HEAD
                 RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
+=======
+                RevHubOrientationOnRobot.UsbFacingDirection.LEFT));
+>>>>>>> 9e1e7b68b9fe1f3e89df69324519782b82a75a79
         imu.initialize(parameters);
 
         telemetry.addLine("Initialization Complete!");
@@ -71,7 +75,11 @@ public class FieldCentricTest extends LinearOpMode {
             }
 
             // 3. Get current robot heading (in radians)
+<<<<<<< HEAD
             double botHeading = imu.getRobotYawPitchRoll().yaw;
+=======
+            double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+>>>>>>> 9e1e7b68b9fe1f3e89df69324519782b82a75a79
 
             // 4. Field Centric Math (Coordinate Rotation)
             // This is the magic that makes the robot "forget its head and follow the field"
